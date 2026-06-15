@@ -4,9 +4,12 @@ import { ExternalLink, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Channel {
-  channelId: string;
-  channelName: string;
-  channelUrl: string;
+  id: string;
+  name: string;
+  username: string;
+  url: string;
+  type: string;
+  isActive: boolean;
 }
 
 interface ForceJoinStatus {
@@ -78,11 +81,16 @@ export default function ForceJoinGate({ telegramId, children }: ForceJoinGatePro
         <div className="space-y-3 mb-6">
           {data.pendingChannels.map((ch) => (
             <button
-              key={ch.channelId}
-              onClick={() => openChannel(ch.channelUrl)}
-              className="w-full flex items-center justify-between bg-muted hover:bg-muted/80 rounded-2xl px-4 py-3 text-left transition-colors active:scale-98"
+              key={ch.id}
+              onClick={() => openChannel(ch.url)}
+              className="w-full flex items-center justify-between bg-muted hover:bg-muted/80 rounded-2xl px-4 py-3 text-left transition-colors active:scale-[0.98]"
             >
-              <span className="font-medium text-sm">{ch.channelName}</span>
+              <div>
+                <p className="font-medium text-sm">{ch.name}</p>
+                {ch.username && (
+                  <p className="text-xs text-muted-foreground">@{ch.username}</p>
+                )}
+              </div>
               <ExternalLink className="w-4 h-4 text-muted-foreground flex-shrink-0" />
             </button>
           ))}

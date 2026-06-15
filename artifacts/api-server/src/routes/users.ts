@@ -28,11 +28,18 @@ function toUserResponse(data: Record<string, unknown>) {
     rank: "0",
     isBanned: (data.isBanned as boolean | undefined) ?? false,
     dailyBonusLastClaimed: (data.dailyBonusLastClaimed as string | undefined) ?? null,
-    streakDays: 0,
+    streakDays: (data.streakDays as number | undefined) ?? 0,
     tasksCompleted: (data.taskCompletionCount as number | undefined) ?? 0,
     createdAt: (data.createdAt as string | undefined) ?? new Date().toISOString(),
     lastActive: (data.lastActiveAt as string | undefined) ?? new Date().toISOString(),
   };
+}
+
+function getStreakBonus(streakDays: number, baseBonus: number): number {
+  if (streakDays >= 30) return baseBonus + 20;
+  if (streakDays >= 14) return baseBonus + 10;
+  if (streakDays >= 7) return baseBonus + 5;
+  return baseBonus;
 }
 
 router.post("/users/register", async (req, res): Promise<void> => {
@@ -52,6 +59,11 @@ router.post("/users/register", async (req, res): Promise<void> => {
     return;
   }
 
+  const settingsDoc = await db.collection("settings").doc("global").get();
+  const referralBonus = settingsDoc.exists
+    ? ((settingsDoc.data()!.referralBonusAmount as number | undefined) ?? 50)
+    : 50;
+
   const newReferralCode = `REF${telegramId}`;
   const now = new Date().toISOString();
   const userData: Record<string, unknown> = {
@@ -70,6 +82,7 @@ router.post("/users/register", async (req, res): Promise<void> => {
     updatedAt: now,
     lastActiveAt: now,
     dailyBonusLastClaimed: null,
+    streakDays: 0,
     taskCompletionCount: 0,
     referralCount: 0,
   };
@@ -82,7 +95,6 @@ router.post("/users/register", async (req, res): Promise<void> => {
     if (!referrerSnap.empty) {
       const referrerDoc = referrerSnap.docs[0];
       userData.referredBy = referrerDoc.id;
-      const referralBonus = 50;
       await referrerDoc.ref.update({
         balance: ((referrerDoc.data().balance as number | undefined) ?? 0) + referralBonus,
         totalEarned: ((referrerDoc.data().totalEarned as number | undefined) ?? 0) + referralBonus,
@@ -97,6 +109,16 @@ router.post("/users/register", async (req, res): Promise<void> => {
         status: "completed",
         createdAt: now,
       });
+
+      try {
+        const { getTelegramBot } = await import("../lib/bot.js");
+        const bot = getTelegramBot();
+        await bot.telegram.sendMessage(
+          referrerDoc.id,
+          `🎉 You earned <b>${referralBonus} coins</b> from a referral!\n👤 <b>${firstName ?? telegramId}</b> just joined using your link.`,
+          { parse_mode: "HTML" }
+        );
+      } catch { }
     }
   }
 
@@ -169,13 +191,31 @@ router.post("/users/:telegramId/daily-bonus", async (req, res): Promise<void> =>
     }
   }
 
-  const bonus = 10;
+  const settingsDoc = await db.collection("settings").doc("global").get();
+  const baseBonus = settingsDoc.exists
+    ? ((settingsDoc.data()!.dailyBonusAmount as number | undefined) ?? 10)
+    : 10;
+
+  let currentStreak = (data.streakDays as number | undefined) ?? 0;
+
+  if (lastClaimed) {
+    const diffHours = (now.getTime() - lastClaimed.getTime()) / (1000 * 60 * 60);
+    if (diffHours > 48) {
+      currentStreak = 0;
+    }
+  }
+
+  const newStreak = currentStreak + 1;
+  const bonus = getStreakBonus(newStreak, baseBonus);
+
   const nowIso = now.toISOString();
   const newBalance = ((data.balance as number | undefined) ?? 0) + bonus;
+
   await userRef.update({
     balance: newBalance,
     totalEarned: ((data.totalEarned as number | undefined) ?? 0) + bonus,
     dailyBonusLastClaimed: nowIso,
+    streakDays: newStreak,
     updatedAt: nowIso,
   });
 
@@ -183,17 +223,21 @@ router.post("/users/:telegramId/daily-bonus", async (req, res): Promise<void> =>
     telegramId: params.data.telegramId,
     type: "bonus",
     amount: bonus,
-    description: "Daily bonus",
+    description: `Daily bonus (day ${newStreak} streak)`,
     status: "completed",
     createdAt: nowIso,
   });
 
+  const streakMsg = newStreak >= 7
+    ? ` 🔥 ${newStreak}-day streak bonus!`
+    : "";
+
   res.json(ClaimDailyBonusResponse.parse({
     success: true,
     coinsEarned: bonus,
-    streakDays: 1,
+    streakDays: newStreak,
     totalCoins: newBalance,
-    message: "Daily bonus claimed!",
+    message: `Daily bonus claimed!${streakMsg} +${bonus} coins`,
   }));
 });
 
@@ -233,7 +277,7 @@ router.get("/users/stats", async (req, res): Promise<void> => {
     tasksCompleted: tasksSnap.size,
     referralCount: (data.referralCount as number | undefined) ?? 0,
     rank: "0",
-    streakDays: 0,
+    streakDays: (data.streakDays as number | undefined) ?? 0,
     pendingWithdrawals: withdrawalsSnap.size,
     dailyBonusAvailable,
     nextDailyBonusIn: dailyBonusAvailable ? null : nextDailyBonusIn,

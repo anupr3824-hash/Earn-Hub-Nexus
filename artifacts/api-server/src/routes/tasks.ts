@@ -1,5 +1,4 @@
 import { Router, type IRouter } from "express";
-import type { Query } from "firebase-admin/firestore";
 import { getFirestore } from "../lib/firebase";
 import { requireAdmin } from "../middlewares/adminAuth";
 import {
@@ -27,8 +26,34 @@ router.get("/tasks", async (req, res): Promise<void> => {
   }
 
   const db = getFirestore();
-  const snap = await db.collection("tasks").where("isActive", "==", true).get();
-  const tasks = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const [tasksSnap, completionsSnap] = await Promise.all([
+    db.collection("tasks").where("isActive", "==", true).get(),
+    params.data.telegramId
+      ? db.collection("taskCompletions").where("telegramId", "==", params.data.telegramId).get()
+      : Promise.resolve(null),
+  ]);
+
+  const completedTaskIds = new Set(
+    completionsSnap?.docs.map((d) => (d.data().taskId as string | undefined) ?? "") ?? []
+  );
+
+  const tasks = tasksSnap.docs.map((d) => {
+    const data = d.data() as Record<string, unknown>;
+    return {
+      id: d.id,
+      title: (data.title as string | undefined) ?? "",
+      description: (data.description as string | undefined) ?? "",
+      type: (data.type as string | undefined) ?? "general",
+      reward: (data.reward as number | undefined) ?? 0,
+      url: (data.url as string | undefined) ?? null,
+      icon: (data.icon as string | undefined) ?? null,
+      isActive: (data.isActive as boolean | undefined) ?? true,
+      isCompleted: completedTaskIds.has(d.id),
+      totalCompletions: (data.completionCount as number | undefined) ?? 0,
+      createdAt: (data.createdAt as string | undefined) ?? new Date().toISOString(),
+    };
+  });
+
   res.json(ListTasksResponse.parse(tasks));
 });
 
@@ -50,7 +75,20 @@ router.post("/tasks", requireAdmin, async (req, res): Promise<void> => {
   };
   const ref = await db.collection("tasks").add(taskData);
   const doc = await ref.get();
-  res.status(201).json(GetTaskResponse.parse({ id: doc.id, ...doc.data() }));
+  const data = doc.data() as Record<string, unknown>;
+  res.status(201).json(GetTaskResponse.parse({
+    id: doc.id,
+    title: data.title as string,
+    description: data.description as string,
+    type: data.type as string,
+    reward: data.reward as number,
+    url: (data.url as string | undefined) ?? null,
+    icon: (data.icon as string | undefined) ?? null,
+    isActive: data.isActive as boolean,
+    isCompleted: false,
+    totalCompletions: 0,
+    createdAt: data.createdAt as string,
+  }));
 });
 
 router.get("/tasks/:taskId", async (req, res): Promise<void> => {
@@ -66,7 +104,20 @@ router.get("/tasks/:taskId", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Task not found" });
     return;
   }
-  res.json(GetTaskResponse.parse({ id: doc.id, ...doc.data() }));
+  const data = doc.data() as Record<string, unknown>;
+  res.json(GetTaskResponse.parse({
+    id: doc.id,
+    title: data.title as string,
+    description: data.description as string,
+    type: data.type as string,
+    reward: data.reward as number,
+    url: (data.url as string | undefined) ?? null,
+    icon: (data.icon as string | undefined) ?? null,
+    isActive: (data.isActive as boolean | undefined) ?? true,
+    isCompleted: false,
+    totalCompletions: (data.completionCount as number | undefined) ?? 0,
+    createdAt: (data.createdAt as string | undefined) ?? new Date().toISOString(),
+  }));
 });
 
 router.patch("/tasks/:taskId", requireAdmin, async (req, res): Promise<void> => {
@@ -92,7 +143,20 @@ router.patch("/tasks/:taskId", requireAdmin, async (req, res): Promise<void> => 
 
   await ref.update({ ...parsed.data, updatedAt: new Date().toISOString() });
   const updated = await ref.get();
-  res.json(UpdateTaskResponse.parse({ id: updated.id, ...updated.data() }));
+  const data = updated.data() as Record<string, unknown>;
+  res.json(UpdateTaskResponse.parse({
+    id: updated.id,
+    title: data.title as string,
+    description: data.description as string,
+    type: data.type as string,
+    reward: data.reward as number,
+    url: (data.url as string | undefined) ?? null,
+    icon: (data.icon as string | undefined) ?? null,
+    isActive: (data.isActive as boolean | undefined) ?? true,
+    isCompleted: false,
+    totalCompletions: (data.completionCount as number | undefined) ?? 0,
+    createdAt: (data.createdAt as string | undefined) ?? new Date().toISOString(),
+  }));
 });
 
 router.delete("/tasks/:taskId", requireAdmin, async (req, res): Promise<void> => {
@@ -166,8 +230,9 @@ router.post("/tasks/:taskId/complete", async (req, res): Promise<void> => {
   });
 
   const userData = userDoc.data()!;
+  const newBalance = (userData.balance ?? 0) + reward;
   await userDoc.ref.update({
-    balance: (userData.balance ?? 0) + reward,
+    balance: newBalance,
     totalEarned: (userData.totalEarned ?? 0) + reward,
     taskCompletionCount: (userData.taskCompletionCount ?? 0) + 1,
     updatedAt: now,
@@ -178,8 +243,7 @@ router.post("/tasks/:taskId/complete", async (req, res): Promise<void> => {
     updatedAt: now,
   });
 
-  const txRef = db.collection("transactions").doc();
-  await txRef.set({
+  await db.collection("transactions").doc().set({
     telegramId,
     type: "task",
     amount: reward,
@@ -193,7 +257,7 @@ router.post("/tasks/:taskId/complete", async (req, res): Promise<void> => {
   res.json(CompleteTaskResponse.parse({
     success: true,
     coinsEarned: reward,
-    totalCoins: (userData.balance ?? 0) + reward,
+    totalCoins: newBalance,
     message: `Earned ${reward} coins!`,
   }));
 });

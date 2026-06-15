@@ -11,6 +11,13 @@ import {
 
 const router: IRouter = Router();
 
+function scoreToLevel(score: number): string {
+  if (score >= 80) return "critical";
+  if (score >= 60) return "high";
+  if (score >= 30) return "medium";
+  return "low";
+}
+
 router.get("/fraud/risk/:telegramId", requireAdmin, async (req, res): Promise<void> => {
   const params = GetUserRiskScoreParams.safeParse(req.params);
   if (!params.success) {
@@ -37,10 +44,10 @@ router.get("/fraud/risk/:telegramId", requireAdmin, async (req, res): Promise<vo
     accountAgeDays,
   });
 
+  const now = new Date().toISOString();
   await userDoc.ref.update({ riskScore: analysis.riskScore });
 
   if (analysis.riskScore > 70) {
-    const now = new Date().toISOString();
     await db.collection("fraudReports").add({
       telegramId: params.data.telegramId,
       type: "ai_detection",
@@ -49,13 +56,23 @@ router.get("/fraud/risk/:telegramId", requireAdmin, async (req, res): Promise<vo
       status: analysis.recommendation === "ban" ? "actioned" : "pending",
       createdAt: now,
     });
+
+    if (analysis.recommendation === "ban" && analysis.riskScore >= 90) {
+      await userDoc.ref.update({
+        isBanned: true,
+        banReason: `Auto-banned by AI fraud detection (risk score: ${analysis.riskScore})`,
+        updatedAt: now,
+      });
+    }
   }
 
   res.json(GetUserRiskScoreResponse.parse({
     telegramId: params.data.telegramId,
-    riskScore: analysis.riskScore,
-    reasons: analysis.reasons,
+    score: analysis.riskScore,
+    level: scoreToLevel(analysis.riskScore),
+    flags: analysis.reasons,
     recommendation: analysis.recommendation,
+    lastAnalyzed: now,
   }));
 });
 
