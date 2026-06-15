@@ -38070,6 +38070,11 @@ ${balance >= minWithdrawal ? "\u2705 You can withdraw! Open the app:" : `\u274C 
       { parse_mode: "HTML" }
     );
   });
+  b.launch({
+    dropPendingUpdates: true
+  }).catch((err) => logger.error({ err }, "Bot launch failed"));
+  process.once("SIGINT", () => b.stop("SIGINT"));
+  process.once("SIGTERM", () => b.stop("SIGTERM"));
   logger.info("Telegram bot initialized with all commands");
 }
 var import_telegraf, bot;

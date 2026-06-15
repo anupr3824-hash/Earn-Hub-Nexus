@@ -417,5 +417,14 @@ export async function initBot(): Promise<void> {
     );
   });
 
+  // Start polling for messages
+  b.launch({
+    dropPendingUpdates: true,
+  }).catch((err) => logger.error({ err }, "Bot launch failed"));
+
+  // Graceful shutdown
+  process.once("SIGINT", () => b.stop("SIGINT"));
+  process.once("SIGTERM", () => b.stop("SIGTERM"));
+
   logger.info("Telegram bot initialized with all commands");
 }
