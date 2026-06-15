@@ -99,6 +99,15 @@ function getStreakBonus(streakDays: number, baseBonus: number): number {
   return baseBonus;
 }
 
+function getValidMiniAppUrl(): string | null {
+  const url = process.env.MINI_APP_URL ?? "";
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "https:") return url;
+  } catch { }
+  return null;
+}
+
 export async function initBot(): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
@@ -123,17 +132,17 @@ export async function initBot(): Promise<void> {
         ? (settingsDoc.data()!.welcomeMessage ?? "Welcome to EarnBot!")
         : "Welcome to EarnBot!";
 
-      const miniAppUrl = process.env.MINI_APP_URL ?? "https://t.me/your_bot/app";
+      const miniAppUrl = getValidMiniAppUrl();
 
       await ctx.reply(
         `${welcomeMsg}\n\n🎯 Earn coins by:\n• ✅ Completing tasks\n• 👥 Inviting friends\n• 🔥 Daily check-in streaks\n\n💰 Open the app to get started:`,
-        {
+        miniAppUrl ? {
           reply_markup: {
             inline_keyboard: [[
               { text: "🚀 Open EarnBot App", web_app: { url: miniAppUrl } },
             ]],
           },
-        }
+        } : {}
       );
     } catch (err) {
       logger.error({ err }, "Bot start handler error");
@@ -285,7 +294,7 @@ export async function initBot(): Promise<void> {
         return;
       }
 
-      const miniAppUrl = process.env.MINI_APP_URL ?? "https://t.me/your_bot/app";
+      const miniAppUrl = getValidMiniAppUrl();
       const taskList = available.slice(0, 5).map((d) => {
         const t = d.data();
         return `• ${t.title as string} — <b>+${t.reward as number} coins</b>`;
@@ -295,11 +304,13 @@ export async function initBot(): Promise<void> {
         `📋 <b>Available Tasks (${available.length})</b>\n\n${taskList}\n\nOpen the app to complete them:`,
         {
           parse_mode: "HTML",
-          reply_markup: {
-            inline_keyboard: [[
-              { text: "📱 Open App", web_app: { url: miniAppUrl } },
-            ]],
-          },
+          ...(miniAppUrl ? {
+            reply_markup: {
+              inline_keyboard: [[
+                { text: "📱 Open App", web_app: { url: miniAppUrl } },
+              ]],
+            },
+          } : {}),
         }
       );
     } catch (err) {
@@ -329,7 +340,7 @@ export async function initBot(): Promise<void> {
         ? ((settingsDoc.data()!.minWithdrawalAmount as number | undefined) ?? 100)
         : 100;
 
-      const miniAppUrl = process.env.MINI_APP_URL ?? "https://t.me/your_bot/app";
+      const miniAppUrl = getValidMiniAppUrl();
 
       if (pendingSnap.size > 0) {
         const pw = pendingSnap.docs[0].data();
@@ -350,7 +361,7 @@ export async function initBot(): Promise<void> {
         `${balance >= minWithdrawal ? "✅ You can withdraw! Open the app:" : `❌ Need ${minWithdrawal - balance} more coins to withdraw.`}`,
         {
           parse_mode: "HTML",
-          reply_markup: balance >= minWithdrawal ? {
+          reply_markup: (balance >= minWithdrawal && miniAppUrl) ? {
             inline_keyboard: [[
               { text: "💸 Withdraw Now", web_app: { url: miniAppUrl } },
             ]],
