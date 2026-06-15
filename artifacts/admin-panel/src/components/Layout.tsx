@@ -2,7 +2,7 @@ import { ReactNode, useState } from "react";
 import { useLocation, Link } from "wouter";
 import {
   LayoutDashboard, Users, CheckSquare, Wallet, Megaphone, LogOut,
-  Menu, X, Shield,
+  Menu, X, Shield, Settings,
 } from "lucide-react";
 
 const navItems = [
@@ -11,6 +11,7 @@ const navItems = [
   { path: "/tasks", icon: CheckSquare, label: "Tasks" },
   { path: "/withdrawals", icon: Wallet, label: "Withdrawals" },
   { path: "/broadcast", icon: Megaphone, label: "Broadcast" },
+  { path: "/settings", icon: Settings, label: "Settings" },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {

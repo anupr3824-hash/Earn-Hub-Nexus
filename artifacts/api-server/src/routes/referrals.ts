@@ -31,17 +31,18 @@ router.get("/referrals/:telegramId", async (req, res): Promise<void> => {
     return {
       telegramId: r.telegramId as string,
       username: (r.username as string | undefined) ?? null,
-      firstName: (r.firstName as string | undefined) ?? "",
-      joinedAt: r.createdAt as string,
+      firstName: (r.firstName as string | undefined) ?? "User",
+      joinedAt: (r.createdAt as string | undefined) ?? new Date().toISOString(),
+      coinsEarned: 50,
     };
   });
 
+  const referralCode = (userData.referralCode as string | undefined) ?? `REF${params.data.telegramId}`;
   res.json(GetReferralInfoResponse.parse({
-    telegramId: params.data.telegramId,
-    referralCode: (userData.referralCode as string | undefined) ?? `REF${params.data.telegramId}`,
-    referralLink: `https://t.me/${process.env.BOT_USERNAME ?? "bot"}?start=REF${params.data.telegramId}`,
-    referralCount: referrals.length,
-    totalReferralEarnings: referrals.length * 50,
+    referralCode,
+    referralLink: `https://t.me/${process.env.BOT_USERNAME ?? "earnbot"}?start=${referralCode}`,
+    totalReferrals: referrals.length,
+    totalEarnedFromReferrals: referrals.length * 50,
     referrals,
   }));
 });

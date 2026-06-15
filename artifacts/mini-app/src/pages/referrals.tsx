@@ -13,8 +13,9 @@ interface Referral {
 
 interface ReferralData {
   referralCode: string;
-  referralCount: number;
-  totalEarned: number;
+  referralLink: string;
+  totalReferrals: number;
+  totalEarnedFromReferrals: number;
   referrals: Referral[];
 }
 
@@ -25,17 +26,17 @@ export default function ReferralsPage() {
   const { data, isLoading } = useQuery<ReferralData>({
     queryKey: ["referrals", telegramId],
     queryFn: async () => {
-      const res = await axiosInstance.get(`/referrals?telegramId=${telegramId}`);
+      const res = await axiosInstance.get(`/referrals/${telegramId}`);
       return res.data;
     },
   });
 
-  const referralLink = `https://t.me/?start=${data?.referralCode ?? ""}`;
+  const referralLink = data?.referralLink ?? `https://t.me/earnbot?start=${data?.referralCode ?? ""}`;
 
   const share = () => {
     if (window.Telegram?.WebApp?.openTelegramLink) {
       window.Telegram.WebApp.openTelegramLink(
-        `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent("Join and earn coins!")}`
+        `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent("Join and earn coins! 🎉")}`
       );
     } else {
       navigator.clipboard.writeText(referralLink);

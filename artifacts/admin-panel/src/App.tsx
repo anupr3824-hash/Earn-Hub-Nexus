@@ -9,6 +9,7 @@ import UsersPage from "@/pages/users";
 import TasksPage from "@/pages/tasks";
 import WithdrawalsPage from "@/pages/withdrawals";
 import BroadcastPage from "@/pages/broadcast";
+import SettingsPage from "@/pages/settings";
 import Layout from "@/components/Layout";
 import { queryClient } from "@/lib/queryClient";
 
@@ -48,6 +49,11 @@ function Router() {
       <Route path="/broadcast">
         <ProtectedLayout>
           <BroadcastPage />
+        </ProtectedLayout>
+      </Route>
+      <Route path="/settings">
+        <ProtectedLayout>
+          <SettingsPage />
         </ProtectedLayout>
       </Route>
       <Route component={NotFound} />

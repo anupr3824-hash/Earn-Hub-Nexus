@@ -56,7 +56,7 @@ export default function WalletPage() {
   const { data: wdData } = useQuery({
     queryKey: ["withdrawals", telegramId],
     queryFn: async () => {
-      const res = await axiosInstance.get(`/wallet/withdrawals?telegramId=${telegramId}`);
+      const res = await axiosInstance.get(`/wallet/${telegramId}/withdrawals`);
       return res.data;
     },
   });

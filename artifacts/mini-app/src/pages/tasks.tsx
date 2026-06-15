@@ -34,14 +34,13 @@ export default function TasksPage() {
 
   const completeMutation = useMutation({
     mutationFn: async (taskId: string) => {
-      const res = await axiosInstance.post("/tasks/complete", {
+      const res = await axiosInstance.post(`/tasks/${taskId}/complete`, {
         telegramId,
-        taskId,
       });
       return res.data;
     },
     onSuccess: (data) => {
-      toast({ title: `+${data.coinsEarned} coins earned!`, description: data.message ?? "Task completed!" });
+      toast({ title: `+${data.reward ?? data.coinsEarned} coins earned!`, description: data.message ?? "Task completed!" });
       qc.invalidateQueries({ queryKey: ["tasks", telegramId] });
       qc.invalidateQueries({ queryKey: ["stats", telegramId] });
     },

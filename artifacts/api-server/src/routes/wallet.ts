@@ -27,11 +27,23 @@ router.get("/wallet/:telegramId", async (req, res): Promise<void> => {
   }
 
   const data = doc.data()!;
+  const withdrawSnap = await db.collection("withdrawals")
+    .where("telegramId", "==", params.data.telegramId)
+    .get();
+  const withdrawals = withdrawSnap.docs.map((d) => d.data());
+  const pendingCount = withdrawals.filter((w) => w.status === "pending").length;
+  const approvedCount = withdrawals.filter((w) => w.status === "approved").length;
+  const rejectedCount = withdrawals.filter((w) => w.status === "rejected").length;
+  const balance = (data.balance as number | undefined) ?? 0;
+
   res.json(GetWalletResponse.parse({
-    telegramId: data.telegramId,
-    balance: (data.balance as number | undefined) ?? 0,
-    totalEarned: (data.totalEarned as number | undefined) ?? 0,
-    pendingWithdrawals: 0,
+    telegramId: params.data.telegramId,
+    coins: balance,
+    totalEarnings: (data.totalEarned as number | undefined) ?? 0,
+    pendingWithdrawals: pendingCount,
+    approvedWithdrawals: approvedCount,
+    rejectedWithdrawals: rejectedCount,
+    withdrawableBalance: balance,
   }));
 });
 

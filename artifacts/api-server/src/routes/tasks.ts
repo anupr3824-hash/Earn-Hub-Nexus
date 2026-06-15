@@ -191,8 +191,9 @@ router.post("/tasks/:taskId/complete", async (req, res): Promise<void> => {
 
   req.log.info({ telegramId, taskId: params.data.taskId, reward }, "Task completed");
   res.json(CompleteTaskResponse.parse({
-    reward,
-    newBalance: (userData.balance ?? 0) + reward,
+    success: true,
+    coinsEarned: reward,
+    totalCoins: (userData.balance ?? 0) + reward,
     message: `Earned ${reward} coins!`,
   }));
 });

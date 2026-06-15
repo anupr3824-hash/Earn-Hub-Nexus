@@ -1,0 +1,2 @@
+- [Telegram Earn Platform Architecture](platform-architecture.md) — monorepo with api-server (Express+Firebase), mini-app (Vite+React), admin-panel; key config and schema decisions.
+- [API Field Name Contracts](api-field-names.md) — critical schema mismatches found and fixed; Zod schemas are source of truth.
